@@ -97,6 +97,26 @@ def test_flush_time_size(mock_send, caplog):
 
 
 @mock.patch("elasticapm.transport.base.Transport.send")
+def test_flush_time_flush_disabled(mock_send, caplog):
+    transport = Transport(metadata={}, max_flush_time=5)
+    transport._last_flush = timeit.default_timer() - 5.1
+    transport.queue("error", {}, flush=False)
+
+    assert mock_send.call_count == 0
+    assert transport._queued_data is not None
+
+
+@mock.patch("elasticapm.transport.base.Transport.send")
+def test_flush_time_size_flush_disabled(mock_send, caplog):
+    transport = Transport(metadata={}, max_buffer_size=100)
+    # we need to add lots of uncompressible data to fill up the gzip-internal buffer
+    for i in range(9):
+        transport.queue("error", "".join(random.choice(string.ascii_letters) for i in range(2000)), flush=False)
+    assert mock_send.call_count == 0
+    assert transport._queued_data is not None
+
+
+@mock.patch("elasticapm.transport.base.Transport.send")
 def test_forced_flush(mock_send, caplog):
     with caplog.at_level("DEBUG", "elasticapm.transport"):
         transport = Transport(metadata={}, max_buffer_size=1000, compress_level=0)

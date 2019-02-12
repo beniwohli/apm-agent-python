@@ -53,7 +53,7 @@ class MetricsRegistry(object):
         for name, metricset in compat.iteritems(self._metricsets):
             data = metricset.collect()
             if data:
-                self._queue_func("metricset", data)
+                self._queue_func("metricset", data, flush=False)
 
     def _start_collect_timer(self, timeout=None):
         timeout = timeout or self._collect_interval

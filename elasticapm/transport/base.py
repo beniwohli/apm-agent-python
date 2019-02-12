@@ -59,24 +59,36 @@ class Transport(object):
         self._flush_timer = None
         self._counts = defaultdict(int)
 
-    def queue(self, event_type, data, flush=False):
+    def queue(self, event_type, data, flush=None):
+        """
+        Queue an event for sending to the APM Server.
+
+        The flush parameter can have three values: True, False, and None. If set to None, the determination if the
+        queue should be flushed is based on the queue size and the last flush time.
+
+        :param event_type: type of the event, e.g. "transaction", "error", ...
+        :param data: the event data as a JSON-serializable dict
+        :param flush: indicator if queue should be flushed
+        :return: None
+        """
+        since_last_flush = timeit.default_timer() - self._last_flush
+
         with self._queue_lock:
             queued_data = self.queued_data
             queued_data.write((self._json_serializer({event_type: data}) + "\n").encode("utf-8"))
             self._counts[event_type] += 1
-            since_last_flush = timeit.default_timer() - self._last_flush
             queue_size = 0 if queued_data.fileobj is None else queued_data.fileobj.tell()
         if flush:
             logger.debug("forced flush")
             self.flush()
-        elif self._max_flush_time and since_last_flush > self._max_flush_time:
+        elif flush is not False and self._max_flush_time and since_last_flush > self._max_flush_time:
             logger.debug(
                 "flushing due to time since last flush %.3fs > max_flush_time %.3fs",
                 since_last_flush,
                 self._max_flush_time,
             )
             self.flush()
-        elif self._max_buffer_size and queue_size > self._max_buffer_size:
+        elif flush is not False and self._max_buffer_size and queue_size > self._max_buffer_size:
             logger.debug(
                 "flushing since queue size %d bytes > max_queue_size %d bytes", queue_size, self._max_buffer_size
             )
